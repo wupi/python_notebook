@@ -1,0 +1,106 @@
+import pandas as pd
+from datetime import date
+from datetime import timedelta
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_curve
+from sklearn.ensemble.partial_dependence import plot_partial_dependence
+from sklearn.ensemble.partial_dependence import partial_dependence
+
+
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import precision_recall_curve
+def expandChannel(tt):
+    channels=['custom audience error card','lead ad cf','cs','aymt','pixel cf','email','help center']
+    for channel in channels:
+        tt[channel]=tt['channels'].str.contains(channel)
+tmp['all_avg_conversion_ratio_l7l28']=tmp['all_avg_conversion_l7']/(tmp['all_avg_conversion_l28']+0.01)
+#tmp['n_trigger']=max(tmp['n_trigger']-1,0)
+
+def showModel(tmp,targettype,ntree,lr=0.1):
+    tt=tmp[(tmp['target_type']==targettype)&(tmp['preddate']<'2017-12-31')]
+
+ #   print len(tt.columns)
+  #  expandChannel(tt)
+#    print len(tt.columns)
+    tt=pd.get_dummies(tt, columns = ['adv_region','adv_language'])
+    print (len(tt.columns))
+    g=tt.columns.to_series().groupby(tt.dtypes).groups
+    gg={k.name: v.values for k, v in g.items()}
+    
+    xt=list(gg['float64']) +list(gg['uint8'])#+list(gg['bool'])
+ #   xt.remove('target')
+    print (len(tmp),len(tt),len(gg), tt['target'].mean(),len(xt))
+    X=tt[xt]
+    y=tt['target']
+    X_train, X_test, y_train, y_test = train_test_split(  X, y, test_size=0.33, random_state=42)
+    print (len(X_train),len(X_test))
+
+
+   # rf = RandomForestClassifier(min_samples_split=10, n_estimators=100,n_jobs=10)
+   # rf.fit(X_train,y_train)
+    
+    
+    
+
+    clf = GradientBoostingClassifier(n_estimators=ntree,learning_rate=lr,max_depth=5,random_state=0)
+    clf.fit(X_train, y_train)
+    y_pred_rf = clf.predict_proba(X_test)[:, 1]
+    fpr_rf, tpr_rf, _ = roc_curve(y_test, y_pred_rf)
+  #  print roc_auc_score(y_test, y_pred_rf)
+  #  plt.figure(1)
+    plt.figure(figsize=(10,5)) 
+    plt.subplot(121)
+    plt.plot(fpr_rf, tpr_rf, label='AUC: %s'%round(roc_auc_score(y_test, y_pred_rf),3))
+    
+    plt.xlabel('False positive rate')
+    plt.ylabel('True positive rate')
+    plt.title('ROC curve')
+    plt.legend(loc='best')
+    
+    
+    
+    precision, recall, thresholds = precision_recall_curve(y_test, y_pred_rf)
+
+  #  plt.figure(1)
+    plt.subplot(122)
+    plt.plot(recall, precision, label='RF')
+    
+    plt.xlabel('recall')
+    plt.ylabel('precision')
+    plt.title('precision-recall')
+    
+   # plt.show()
+ 
+  
+
+    importances = clf.feature_importances_
+    indices = np.argsort(importances)[-20:]
+    plt.figure(2)
+    plt.title('Feature Importances')
+    plt.barh(range(len(indices)), importances[indices], color='b', align='center')
+    plt.yticks(range(len(indices)), X.columns[indices])
+    plt.xlabel('Relative Importance')
+    plt.show()
+    print( X.columns[indices])
+    names=X_train.columns.values.tolist()
+   # print names[indices]
+    my_plots = plot_partial_dependence(clf,       
+                                       features=[names[indices[-1]],names[indices[-2]]], # column numbers of plots we want to show
+                                       X=X_train,            # raw predictors data.
+                                       feature_names=names, # labels on graphs
+                                       grid_resolution=10) # number of values to plot on x axis
+    my_plots = plot_partial_dependence(clf,       
+                                       features=[names[indices[-3]],names[indices[-4]]], # column numbers of plots we want to show
+                                       X=X_train,            # raw predictors data.
+                                       feature_names=names, # labels on graphs
+                                       grid_resolution=10) # number of values to plot on x axis  
+    plt.figure(figsize=(18,3)) 
+    for i in range(1,6):
+        plt.subplot(1,5,i)
+        tt[names[indices[-i]]+'_g'] = pd.qcut(tt[names[indices[-i]]].values+0.001*np.random.rand(len(tt)), 10)
+
+        tt.groupby([names[indices[-i]]+'_g'])['target'].agg( 'mean').plot(kind='bar')
+    
+   
